@@ -581,9 +581,11 @@ def page_today():
         if open_tasks.empty:
             st.success("No open tasks.")
         else:
+            today = date.today().isoformat()
+
             focus = open_tasks[
                 (open_tasks["priority"] == "High")
-                | (open_tasks["due_date"] == date.today().isoformat())
+                | (open_tasks["due_date"].notna() & (open_tasks["due_date"] <= today))
                 | (open_tasks["is_next_action"] == 1)
             ].head(10)
 
@@ -734,6 +736,32 @@ def page_areas_projects():
 
         with st.expander(f"{a['emoji']} {a['name']} · {len(area_projects)} projects · {len(area_tasks)} open tasks", expanded=False):
             st.write(a["description"] or "No description yet.")
+
+                        # Tasks assigned to this area but not to any project
+            area_level_tasks = area_tasks[
+                area_tasks["project_id"].isna()
+            ] if not area_tasks.empty else pd.DataFrame()
+
+            if not area_level_tasks.empty:
+                st.markdown("### Quick Capture / No Project")
+
+                for _, t in area_level_tasks.iterrows():
+                    c1, c2, c3 = st.columns([5, 1, 1])
+
+                    c1.write(
+                        f"**{t['title']}**  \n"
+                        f"{t['priority']} · {t['task_type']} · {t['effort']} · Due: {t['due_date'] or 'No date'}"
+                    )
+
+                    if c2.button("Done", key=f"area_done_{t['id']}"):
+                        complete_task(int(t["id"]))
+                        st.rerun()
+
+                    if c3.button("Delete", key=f"area_del_{t['id']}"):
+                        delete_task(int(t["id"]))
+                        st.rerun()
+
+                st.divider()
 
             for _, p in area_projects.iterrows():
                 p_tasks = open_tasks[open_tasks["project_id"] == p["id"]] if not open_tasks.empty else pd.DataFrame()
